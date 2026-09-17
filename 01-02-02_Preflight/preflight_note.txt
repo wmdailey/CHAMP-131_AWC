@@ -8,7 +8,7 @@ Password: XXXXXXXXXX
 CLOUDERA PAYWALL LICENSE
 login: c7e8d5ae-7943-4935-a67c-10aa004f724a
 password: 7f6ab3475557
-String: “c7e8d5ae-7943-4935-a67c-10aa004f724a:7f6ab3475557"
+String: "c7e8d5ae-7943-4935-a67c-10aa004f724a:7f6ab3475557"
 
 AMAZON WEB SERVICES 
 STUDENT-IAM 
@@ -29,7 +29,7 @@ container.repository.cloudera.com
 REPOSITORY ACCESS
 A successful response returns a JSON manifest. An HTTP 401 indicates invalid or missing license entitlement. Confirm access to the required repository by running the below example artifact:
 
-curl -ku “c7e8d5ae-7943-4935-a67c-10aa004f724a:7f6ab3475557" \
+curl -ku "c7e8d5ae-7943-4935-a67c-10aa004f724a:7f6ab3475557" \
   https://container.repository.cloudera.com/v2/cloudera-helm/awc-core/anywhere-cloud/manifests/1.0.0-b24
 
 CLOUD FACTORY
