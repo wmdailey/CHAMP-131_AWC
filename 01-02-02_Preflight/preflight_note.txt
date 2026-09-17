@@ -1,0 +1,57 @@
+** CHAMP-131 CCF Properties
+
+PERSONAL ACCOUNT
+OKTA User Account
+User: XXXXXXXX
+Password: XXXXXXXXXX
+
+CLOUDERA PAYWALL LICENSE
+login: c7e8d5ae-7943-4935-a67c-10aa004f724a
+password: 7f6ab3475557
+String: “c7e8d5ae-7943-4935-a67c-10aa004f724a:7f6ab3475557"
+
+AMAZON WEB SERVICES 
+STUDENT-IAM 
+Access Key: XXXXXXXXXXX
+Secret Key:  XXXXXXXXXXX
+
+VIRTUAL PRIVATE CLOUD
+AWS region: us-west-2
+VPC ID: vpc-0c55644ba799825a2
+
+ROUTE 53 HOSTED DNS 
+BaseDomain: a19881.test.cldr.work
+ClusterDomain: student07.a19881.test.cldr.work
+
+CLOUDERA REPOSITORY
+container.repository.cloudera.com
+
+REPOSITORY ACCESS
+A successful response returns a JSON manifest. An HTTP 401 indicates invalid or missing license entitlement. Confirm access to the required repository by running the below example artifact:
+
+curl -ku “c7e8d5ae-7943-4935-a67c-10aa004f724a:7f6ab3475557" \
+  https://container.repository.cloudera.com/v2/cloudera-helm/awc-core/anywhere-cloud/manifests/1.0.0-b24
+
+CLOUD FACTORY
+CCF Group: eng-ai-prod-enablement-dev
+CCF Group ID: 109
+CCF Project ID: 5531
+
+ROBOT USER 
+Access Key: XXXXXXXX 
+Secret Key: XXXXXXXX 
+
+LDAP
+User: admin
+Password: BadPass@1
+
+SERVER IP ADDRESSES 
+Bastion  10.80.129.106
+Master01 10.80.146.228
+Worker01 10.80.138.1
+Worker02 10.80.155.64
+
+CLOUDERA INTERNAL DOCS
+https://docs-beta.cloudera.com/cloudera-anywhere-cloud/test/index
+User: XXXXXXX 
+Password: XXXXXXXXX
