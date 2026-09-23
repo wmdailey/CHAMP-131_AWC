@@ -35,7 +35,7 @@ curl -ku "c7e8d5ae-7943-4935-a67c-10aa004f724a:7f6ab3475557" \
 CLOUD FACTORY
 CCF Group: eng-ai-prod-enablement-dev
 CCF Group ID: 109
-CCF Project ID: 5531
+CCF Project ID: XXXX
 
 ROBOT USER 
 Access Key: XXXXXXXX 
