@@ -8,7 +8,7 @@ taikunSecret: awc-taikun-secrets
 
 dns:
   baseDomain: "a19881.test.cldr.work"
-  clusterDomain: "student07.a19881.test.cldr.work"
+  clusterDomain: "student<XX>.a19881.test.cldr.work"
 
 preInstallCheckSingleConsole:
   enabled: false
@@ -29,12 +29,12 @@ externalDns:
       - name: AWS_ACCESS_KEY_ID
         valueFrom:
           secretKeyRef:
-            name: student07-route53-creds
+            name: student<XX>-route53-creds
             key: aws-access-key-id
       - name: AWS_SECRET_ACCESS_KEY
         valueFrom:
           secretKeyRef:
-            name: student07-route53-creds
+            name: student<XX>-route53-creds
             key: aws-secret-access-key
       - name: AWS_DEFAULT_REGION
         value: "us-west-2"
