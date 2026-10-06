@@ -1,0 +1,72 @@
+Anywhere Cloud Notepad 
+
+CONFIGURE ACCESS TO DOCS
+* https://docs-beta.cloudera.com/cloudera-anywhere-cloud/test/index
+* Okta User: XXXXXXX 
+* Okta Password: XXXXXXXXX
+
+CONFIGURE STUDENT ID
+student ID: student<XX>
+⚠ WARNING — Use Your Own Student ID. This exercise is written for student 33. Up to 24 students may be onboarding CCF in parallel against the same AWS account, and CCF cloud-credential names, private-repository names, robot-user names, and SSH key names are all globally unique per tenant. Wherever you see student<XX> substitute your own student number (e.g. student07-aws-cred). 
+
+CONFIGURE IAM USER 
+* ccf.cloudera.com/org = eng-ai-prod-enablement-dev
+* ccf.cloudera.com/org-id = 109
+* ccf.cloudera.com/project = student<XX>-proj
+* ccf.cloudera.com/managed = false 
+
+CONFIGURE CCFs AWS CREDENTIALS
+* StudentID: student33
+* IAM Access Key: XXXXXXXXX
+* IAM Secret Key: XXXXXXXXX
+* AWS region: us-west-2
+* VPC ID: vpc-0c55644ba799825a2
+* Private Subnet: subnet-05bbb3a6c02d0a76a (10.80.128.0/19 us-west-2a) 
+* EFS: fs-060a4f10832a85se8 (awc-efs-backups) 0 GB
+
+CONFIGURE ROBOT USER
+* Robot User Access Key: XXXXXX
+* Robot User Secret Key: XXXXXXX
+
+CONFIGURE PROJECT ID
+* Project ID
+
+CONFIGURE CSK CLUSTER
+* CCF Project ID: 7885
+* Bastion: t3.large
+* Master: m6i.xlarge
+* Workers: m6i.xlarge
+
+CONFIGURE PRIVATE REGISTRY
+* Private Registry: container.repository.cloudera.com
+* Paywall License login: 491e66b8-2e6a-487b-b3ec-ecfe974ffd9e
+* Paywall License Password : f487e7e64dd7
+curl -ku "491e66b8-2e6a-487b-b3ec-ecfe974ffd9e:f487e7e64dd7" \
+  https://container.repository.cloudera.com/v2/cloudera-helm/awc-core/anywhere-cloud/manifests/1.0.0-b24
+
+CONFIGURE CATALOG
+* dns.baseDomain: a19881.test.cldr.work
+* dns.clusterDomain: student07.a19881.test.cldr.work
+* DNS BaseDomain: a19881.test.cldr.work
+* DNS ClusterDomain: student07.a19881.test.cldr.work
+* externalDns.enabled: true
+
+CONFIGURE SECRETS
+* Namespace: awc-core
+* Route 53 Secret: student${N}-route53-creds
+* Cloud Factory Robot Secret: awc-taikun-secrets
+* Registry Secret: awc-console-registry-creds
+* LDAP Secret: ldap-bootstrap-credentials
+
+CONFIGURE LDAP USER
+* User: admin
+* Password: BadPass@1
+
+CONFIGURE SSH ACCESS
+* SSH key: student<xx>-key
+* Bastion:  XXX.XXX.XXX.XXX
+* Master01:  XXX.XXX.XXX.XXX
+* Worker01:  XXX.XXX.XXX.XXX
+* Worker02:  XXX.XXX.XXX.XXX
+* Worker03:  XXX.XXX.XXX.XXX
+

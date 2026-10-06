@@ -13,16 +13,14 @@
 #      resource at a time, reading the values it needs from the environment
 #      variables you exported in step 1:
 #
-#          ./set-awc-secrets.sh --verify-env  # confirm the eight env vars are set
-#          ./set-awc-secrets.sh --namespace   # create the awc-core namespace
-#          ./set-awc-secrets.sh --ccf         # create the CCF API secret
-#          ./set-awc-secrets.sh --reg         # create the registry pull secret
-#          ./set-awc-secrets.sh --route       # create the Route53 creds secret
-#          ./set-awc-secrets.sh --ldap        # create the LDAP admin secret
-#          ./set-awc-secrets.sh --all         # namespace + all four secrets
-#          ./set-awc-secrets.sh --check       # verify everything exists
-#          ./set-awc-secrets.sh --delete      # delete all four secrets (keep ns)
-#          ./set-awc-secrets.sh -h            # print usage
+#          ./set-awc-secrets.sh --check      # verify everything exists
+#          ./set-awc-secrets.sh --namespace  # create the awc-core namespace
+#          ./set-awc-secrets.sh --route      # create the Route53 creds secret
+#          ./set-awc-secrets.sh --robot      # create the CCF API secret
+#          ./set-awc-secrets.sh --registry   # create the registry pull secret
+#          ./set-awc-secrets.sh --ldap       # create the LDAP admin secret
+#          ./set-awc-secrets.sh --delete     # delete all four secrets (keep ns)
+#          ./set-awc-secrets.sh -h           # print usage
 #
 # The env-var flow MUST be sourced (child-shell exports don't reach the
 # parent). The kubectl-side flows can be either sourced or executed — the
@@ -48,6 +46,91 @@
 # env var into the pod, so the key names must match what the app looks
 # up. The values are copied through unchanged; only the mapping label
 # differs between shell-side names and secret-side names.
+#
+# =========================================================================
+# Purpose of each secret (all live in namespace awc-core)
+# =========================================================================
+#
+# --robot creates awc-taikun-secrets  [type Opaque, 8 keys]
+#     Feeds the running AWC Console the credentials it needs to
+#     authenticate back to the CCF API and read the
+#     marketplace catalog. Contains three CCF identifiers
+#     (project id, access key, secret key) plus five tenant-wide
+#     constants (marketplace URL, sync interval, API host,
+#     account name, organization id). The keys inside the secret
+#     use two different naming conventions, matching the two
+#     hardcoded prefixes the console binary looks for:
+#       - TAIKUN_*        for the CCF API auth keys
+#       - MARKETPLACE_*   (bare, no TAIKUN_ prefix) for the
+#                         marketplace catalog registry URL and
+#                         sync interval
+#     If you set the marketplace keys with a TAIKUN_ prefix the
+#     console silently ignores them and the marketplace stays
+#     empty. The shell-side variable names remain CCF_* — only
+#     the secret-side key names take these two prefixes.
+#
+# --registry creates awc-console-registry-creds  [type kubernetes.io/dockerconfigjson]
+#       and container.repository.cloudera.com  [same type, alias]
+#     A docker-registry secret used to pull AWC images from the
+#     three private Cloudera registries — container.repository.
+#     cloudera.com, docker-private.infra.cloudera.com, and
+#     docker-sandbox.infra.cloudera.com. The same paywall
+#     username/password authenticates to all three; the script
+#     computes the base64 auth string, builds a docker-config
+#     JSON in a temp file, hands it to kubectl, and shreds the
+#     temp file.
+#     Two Kubernetes-side names for the same docker-config: the
+#     canonical awc-console-registry-creds (set as
+#     global.registryCredsSecret in the CCF UI) and a hostname-
+#     named alias container.repository.cloudera.com. Several
+#     AWC sub-chart pre-install Jobs (patch-registry-creds,
+#     patch-ldap-creds, patch-external-dns-creds) ignore the
+#     global and fall back to the registry hostname as the
+#     pull-secret name — creating both here means every
+#     image-pull path resolves without a second CCF UI knob.
+#
+# --route creates student${N}-route53-creds  [type Opaque, 2 keys]
+#     aws-access-key-id and aws-secret-access-key. Read at
+#     runtime by the external-dns sidecar so it can write DNS
+#     records for console.<your-cluster-domain> into Route 53.
+#     The cluster domain is whatever your CCF admin provisioned
+#     as your per-student Route 53 hosted zone — read it out of
+#     Route 53 with:
+#       aws route53 list-hosted-zones \
+#         --query 'HostedZones[?Config.PrivateZone==`false`].Name' \
+#         --output text
+#     and use that zone name as your dns.baseDomain in 05-01-02.
+#
+# --ldap creates ldap-bootstrap-credentials  [type Opaque, 2 keys]
+#     username=$LDAP_USERNAME and password=$LDAP_PASSWORD. Read once at
+#     install time by the Console's Knox LDAP module to seed the
+#     bootstrap admin account you sign in with the first time.
+#
+# --delete removes all four secrets from the awc-core namespace.
+#     Uses `kubectl delete --ignore-not-found` so it is idempotent
+#     and safe to re-run. The namespace itself is left in place —
+#     re-run --robot/--registry/--route/--ldap to recreate.
+#     Does NOT touch the AWC Console Helm release; if you want to
+#     fully tear down the installed Console, `helm uninstall` it
+#     first, then run --delete.
+#
+# Sourced-flow behavior:
+#   - Hidden prompts do not echo what you type.
+#   - Press Enter at any prompt to keep the value already in the shell.
+#   - The summary prints variable names and lengths only, never values.
+#   - Nothing is written to disk; values live only in the current shell.
+#
+# Order for exercise 05-01-02:
+#   1.  source ./set-awc-secrets.sh      # set the eight env vars
+#   2.  ./set-awc-secrets.sh --namespace # namespace first
+#   3.  ./set-awc-secrets.sh --route
+#   4.  ./set-awc-secrets.sh --robot
+#   5.  ./set-awc-secrets.sh --registry
+#   6.  ./set-awc-secrets.sh --ldap
+#   7.  ./set-awc-secrets.sh --check     # verify all four before moving on
+#
+# Every secret-create call uses `--dry-run=client -o yaml | kubectl apply -f -`
+# so re-running is safe — the existing secret is patched, not duplicated.
 
 # =========================================================================
 # Constants
@@ -82,14 +165,12 @@ usage() {
     cat <<'USAGE'
 Usage:
   source ./set-awc-secrets.sh          Interactively set eight env vars (must source).
-  ./set-awc-secrets.sh --verify-env    Confirm the eight env vars are set (OK/MISSING).
-  ./set-awc-secrets.sh --namespace     Create the awc-core namespace.
-  ./set-awc-secrets.sh --ccf           Create the CCF API secret.
-  ./set-awc-secrets.sh --reg           Create the registry pull secret.
-  ./set-awc-secrets.sh --route         Create the AWS Route53 creds secret.
-  ./set-awc-secrets.sh --ldap          Create the LDAP admin secret.
-  ./set-awc-secrets.sh --all           namespace + all four secrets, in order.
   ./set-awc-secrets.sh --check         Verify namespace and all four secrets.
+  ./set-awc-secrets.sh --namespace     Create the awc-core namespace.
+  ./set-awc-secrets.sh --route         Create the AWS Route53 creds secret.
+  ./set-awc-secrets.sh --robot         Create the CCF API secret.
+  ./set-awc-secrets.sh --registry      Create the registry pull secret.
+  ./set-awc-secrets.sh --ldap          Create the LDAP admin secret.
   ./set-awc-secrets.sh --delete        Delete all four secrets (namespace kept).
   ./set-awc-secrets.sh -h | --help     Show this message.
 
@@ -97,111 +178,23 @@ Environment variables prompted for by the sourced flow (in order):
 
   STUDENT_NUMBER                       (default 33)
 
-  ── CCF Robot User (from 04-01-02) ──
+  ── Route 53 credentials: student${N}-route53-creds
+  STUDENT${N}_ACCESS_KEY_ID            (echoed)
+  STUDENT${N}_SECRET_ACCESS_KEY        (hidden)
+
+  ── CCF Robot User: awc-taikun-secrets
   CCF_PROJECT_ID                       (echoed)
   CCF_ACCESS_KEY                       (hidden)
   CCF_SECRET_KEY                       (hidden)
 
-  ── Cloudera paywall (private registries) ──
+  ── Cloudera paywall (private registries): awc-console-registry-creds 
   PAYWALL_USER                         (echoed)
   PAYWALL_PASS                         (hidden)
 
-  ── IAM user student${N}-awc (from 03-02-03) ──
-  STUDENT${N}_ACCESS_KEY_ID            (echoed)
-  STUDENT${N}_SECRET_ACCESS_KEY        (hidden)
+  ── AWC Console LDAP bootstrap credentials: ldap-bootstrap-credentials 
+  LDAP_USERNAME                        (echoed, default "admin")
+  LDAP_PASSWORD                        (hidden)
 
-  ── AWC Console admin bootstrap password ──
-  ADMIN_PASSWORD                       (hidden)
-
-Purpose of each secret (all live in namespace awc-core):
-
-  --ccf creates awc-taikun-secrets  [type Opaque, 8 keys]
-      Feeds the running AWC Console the credentials it needs to
-      authenticate back to the CCF API and read the
-      marketplace catalog. Contains three CCF identifiers
-      (project id, access key, secret key) plus five tenant-wide
-      constants (marketplace URL, sync interval, API host,
-      account name, organization id). The keys inside the secret
-      use two different naming conventions, matching the two
-      hardcoded prefixes the console binary looks for:
-        - TAIKUN_*        for the CCF API auth keys
-        - MARKETPLACE_*   (bare, no TAIKUN_ prefix) for the
-                          marketplace catalog registry URL and
-                          sync interval
-      If you set the marketplace keys with a TAIKUN_ prefix the
-      console silently ignores them and the marketplace stays
-      empty. The shell-side variable names remain CCF_* — only
-      the secret-side key names take these two prefixes.
-
-  --reg creates awc-console-registry-creds  [type kubernetes.io/dockerconfigjson]
-        and container.repository.cloudera.com  [same type, alias]
-      A docker-registry secret used to pull AWC images from the
-      three private Cloudera registries — container.repository.
-      cloudera.com, docker-private.infra.cloudera.com, and
-      docker-sandbox.infra.cloudera.com. The same paywall
-      username/password authenticates to all three; the script
-      computes the base64 auth string, builds a docker-config
-      JSON in a temp file, hands it to kubectl, and shreds the
-      temp file.
-      Two Kubernetes-side names for the same docker-config: the
-      canonical awc-console-registry-creds (set as
-      global.registryCredsSecret in the CCF UI) and a hostname-
-      named alias container.repository.cloudera.com. Several
-      AWC sub-chart pre-install Jobs (patch-registry-creds,
-      patch-ldap-creds, patch-external-dns-creds) ignore the
-      global and fall back to the registry hostname as the
-      pull-secret name — creating both here means every
-      image-pull path resolves without a second CCF UI knob.
-
-  --route creates student${N}-route53-creds  [type Opaque, 2 keys]
-      aws-access-key-id and aws-secret-access-key. Read at
-      runtime by the external-dns sidecar so it can write DNS
-      records for console.<your-cluster-domain> into Route 53.
-      The cluster domain is whatever your CCF admin provisioned
-      as your per-student Route 53 hosted zone — read it out of
-      Route 53 with:
-        aws route53 list-hosted-zones \
-          --query 'HostedZones[?Config.PrivateZone==`false`].Name' \
-          --output text
-      and use that zone name as your dns.baseDomain in 05-01-02.
-
-  --ldap creates ldap-bootstrap-credentials  [type Opaque, 2 keys]
-      username=admin and password=$ADMIN_PASSWORD. Read once at
-      install time by the Console's Knox LDAP module to seed the
-      bootstrap admin account you sign in with the first time.
-
-  --delete removes all four secrets from the awc-core namespace.
-      Uses `kubectl delete --ignore-not-found` so it is idempotent
-      and safe to re-run. The namespace itself is left in place —
-      re-run --ccf/--reg/--route/--ldap (or --all) to recreate.
-      Does NOT touch the AWC Console Helm release; if you want to
-      fully tear down the installed Console, `helm uninstall` it
-      first, then run --delete.
-
-Sourced-flow behavior:
-  - Hidden prompts do not echo what you type.
-  - Press Enter at any prompt to keep the value already in the shell.
-  - The summary prints variable names and lengths only, never values.
-  - Nothing is written to disk; values live only in the current shell.
-
-Order for exercise 05-01-02:
-  1.  source ./set-awc-secrets.sh      # set the eight env vars
-  2.  ./set-awc-secrets.sh --verify-env # confirm the eight env vars are set
-  3.  ./set-awc-secrets.sh --namespace  # namespace first
-  4.  ./set-awc-secrets.sh --ccf
-  5.  ./set-awc-secrets.sh --reg
-  6.  ./set-awc-secrets.sh --route
-  7.  ./set-awc-secrets.sh --ldap
-  8.  ./set-awc-secrets.sh --check      # verify all four before moving on
-
-Or in one shot after sourcing:
-  1.  source ./set-awc-secrets.sh
-  2.  ./set-awc-secrets.sh --verify-env
-  3.  ./set-awc-secrets.sh --all
-  4.  ./set-awc-secrets.sh --check
-
-Every secret-create call uses `--dry-run=client -o yaml | kubectl apply -f -`
-so re-running is safe — the existing secret is patched, not duplicated.
 USAGE
 }
 
@@ -227,7 +220,7 @@ require_env_vars() {
              PAYWALL_USER PAYWALL_PASS \
              "STUDENT${_n}_ACCESS_KEY_ID" \
              "STUDENT${_n}_SECRET_ACCESS_KEY" \
-             ADMIN_PASSWORD; do
+             LDAP_USERNAME LDAP_PASSWORD; do
         _val=$(printenv "$_v" 2>/dev/null || true)
         if [ -z "$_val" ]; then
             echo "MISSING env var: $_v" >&2
@@ -256,7 +249,7 @@ verify_env() {
              PAYWALL_USER PAYWALL_PASS \
              "STUDENT${_n}_ACCESS_KEY_ID" \
              "STUDENT${_n}_SECRET_ACCESS_KEY" \
-             ADMIN_PASSWORD; do
+             LDAP_USERNAME LDAP_PASSWORD; do
         _val=$(printenv "$_v" 2>/dev/null || true)
         if [ -z "$_val" ]; then
             printf '  %-42s  MISSING\n' "$_v"
@@ -342,14 +335,15 @@ ask_paywall() {
 
 ask_aws_keys() {
     local _n="$1"
-    echo "── IAM user student${_n}-awc (from 03-02-03) ──"
-    prompt_var "STUDENT${_n}_ACCESS_KEY_ID"     "IAM access-key ID"     0
-    prompt_var "STUDENT${_n}_SECRET_ACCESS_KEY" "IAM secret access key" 1
+    echo "── Route 53 credentials: student${_n}-awc (from 03-02-03) ──"
+    prompt_var "STUDENT${_n}_ACCESS_KEY_ID"     "AWS access-key ID"     0
+    prompt_var "STUDENT${_n}_SECRET_ACCESS_KEY" "AWS secret access key" 1
 }
 
-ask_admin_password() {
-    echo "── AWC Console admin bootstrap password ──"
-    prompt_var ADMIN_PASSWORD "Admin password (LDAP bootstrap)" 1
+ask_ldap_credentials() {
+    echo "── AWC Console LDAP bootstrap credentials ──"
+    prompt_var LDAP_USERNAME "LDAP username" 0
+    prompt_var LDAP_PASSWORD "LDAP password" 1
 }
 
 print_summary() {
@@ -360,7 +354,7 @@ print_summary() {
              PAYWALL_USER PAYWALL_PASS \
              "STUDENT${_n}_ACCESS_KEY_ID" \
              "STUDENT${_n}_SECRET_ACCESS_KEY" \
-             ADMIN_PASSWORD; do
+             LDAP_USERNAME LDAP_PASSWORD; do
         _val=$(printenv "$_v" 2>/dev/null || true)
         if [ -z "$_val" ]; then
             printf '  %-40s  MISSING\n' "$_v"
@@ -370,7 +364,7 @@ print_summary() {
     done
     echo "─────────────────────────────────────────────────"
     echo "Every variable above is exported into the current shell."
-    echo "Next: ./set-awc-secrets.sh --all   (or --namespace, --ccf, …)"
+    echo "Next: ./set-awc-secrets.sh --namespace"
 }
 
 # =========================================================================
@@ -388,8 +382,8 @@ create_namespace() {
     echo
 }
 
-# Create the CCF API secret. Requires CCF_PROJECT_ID, CCF_ACCESS_KEY,
-# CCF_SECRET_KEY in the environment.
+# Create the robot user secret (CCF API credentials). Requires CCF_PROJECT_ID,
+# CCF_ACCESS_KEY, CCF_SECRET_KEY in the environment.
 #
 # NB: this secret uses TWO different key-naming conventions, matching
 # two independent hardcoded prefixes the AWC Console binary reads:
@@ -409,7 +403,7 @@ create_namespace() {
 # up. The shell-side variables the student types remain CCF_* because
 # CCF is the product name the credentials belong to; only the
 # secret-side key names take these two prefixes.
-create_ccf_secret() {
+create_robot_secret() {
     require_env_vars || return 1
     echo "── Secret: $CCF_SECRET in $NAMESPACE ──"
     kubectl -n "$NAMESPACE" create secret generic "$CCF_SECRET" \
@@ -426,7 +420,7 @@ create_ccf_secret() {
 }
 
 # Create the registry pull secret. Requires PAYWALL_USER, PAYWALL_PASS.
-create_reg_secret() {
+create_registry_secret() {
     require_env_vars || return 1
     echo "── Secret: $REG_SECRET in $NAMESPACE ──"
 
@@ -526,21 +520,12 @@ create_ldap_secret() {
     require_env_vars || return 1
     echo "── Secret: $LDAP_SECRET in $NAMESPACE ──"
     kubectl -n "$NAMESPACE" create secret generic "$LDAP_SECRET" \
-        --from-literal=username=admin \
-        --from-literal=password="$ADMIN_PASSWORD" \
+        --from-literal=username="$LDAP_USERNAME" \
+        --from-literal=password="$LDAP_PASSWORD" \
         --dry-run=client -o yaml | kubectl apply -f -
     echo
 }
 
-# Run every kubectl-side step in the exercise order.
-create_all() {
-    require_env_vars   || return 1
-    create_namespace   || return 1
-    create_ccf_secret  || return 1
-    create_reg_secret  || return 1
-    create_route_secret || return 1
-    create_ldap_secret || return 1
-}
 
 # Delete all four secrets from the awc-core namespace. Idempotent: uses
 # --ignore-not-found so a missing secret is a no-op, not an error. Does
@@ -640,10 +625,10 @@ check_all() {
 cleanup() {
     unset -f usage require_sourced require_env_vars verify_env
     unset -f ask_student_number prompt_var print_intro
-    unset -f ask_taikun ask_paywall ask_aws_keys ask_admin_password
+    unset -f ask_taikun ask_paywall ask_aws_keys ask_ldap_credentials
     unset -f print_summary
-    unset -f create_namespace create_ccf_secret create_reg_secret
-    unset -f create_route_secret create_ldap_secret create_all
+    unset -f create_namespace create_robot_secret create_registry_secret
+    unset -f create_route_secret create_ldap_secret
     unset -f delete_all_secrets
     unset -f check_secret check_all
     unset -f main
@@ -652,6 +637,7 @@ cleanup() {
     unset AWC_MARKETPLACE_REGISTRIES AWC_MARKETPLACE_SYNC_INTERVAL
     unset CCF_API_HOST CCF_ACCOUNT_NAME CCF_ORGANIZATION_ID
     unset REG_CONTAINER REG_DOCKER_PRIVATE REG_DOCKER_SANDBOX
+    unset LDAP_USERNAME LDAP_PASSWORD
     # cleanup unsets itself last.
     unset -f cleanup
 }
@@ -669,36 +655,28 @@ main() {
         -h|--help)
             usage
             ;;
-        --verify-env)
-            verify_env
+        --check)
+            check_all
             _rc=$?
             ;;
         --namespace)
             create_namespace
             _rc=$?
             ;;
-        --ccf)
-            create_ccf_secret
-            _rc=$?
-            ;;
-        --reg)
-            create_reg_secret
-            _rc=$?
-            ;;
         --route)
             create_route_secret
             _rc=$?
             ;;
+        --robot)
+            create_robot_secret
+            _rc=$?
+            ;;
+        --registry)
+            create_registry_secret
+            _rc=$?
+            ;;
         --ldap)
             create_ldap_secret
-            _rc=$?
-            ;;
-        --all)
-            create_all
-            _rc=$?
-            ;;
-        --check)
-            check_all
             _rc=$?
             ;;
         --delete)
@@ -710,10 +688,10 @@ main() {
             require_sourced "$_was_sourced"
             ask_student_number
             print_intro
+            ask_aws_keys "$STUDENT_NUMBER"
             ask_taikun
             ask_paywall
-            ask_aws_keys "$STUDENT_NUMBER"
-            ask_admin_password
+            ask_ldap_credentials
             print_summary "$STUDENT_NUMBER"
             ;;
         *)
