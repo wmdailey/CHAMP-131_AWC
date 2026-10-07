@@ -121,13 +121,14 @@
 #   - Nothing is written to disk; values live only in the current shell.
 #
 # Order for exercise 05-01-02:
-#   1.  source ./set-awc-secrets.sh      # set the eight env vars
-#   2.  ./set-awc-secrets.sh --namespace # namespace first
-#   3.  ./set-awc-secrets.sh --route
-#   4.  ./set-awc-secrets.sh --robot
-#   5.  ./set-awc-secrets.sh --registry
-#   6.  ./set-awc-secrets.sh --ldap
-#   7.  ./set-awc-secrets.sh --check     # verify all four before moving on
+#   1.  ./set-awc-secrets.sh --namespace # namespace first
+#   2.  source ./set-awc-secrets.sh      # set the eight env vars
+#   3.  ./set-awc-secrets.sh --verify-env # confirm the eight env vars are set
+#   4.  ./set-awc-secrets.sh --route
+#   5.  ./set-awc-secrets.sh --robot
+#   6.  ./set-awc-secrets.sh --registry
+#   7.  ./set-awc-secrets.sh --ldap
+#   8.  ./set-awc-secrets.sh --check     # verify all four before moving on
 #
 # Every secret-create call uses `--dry-run=client -o yaml | kubectl apply -f -`
 # so re-running is safe — the existing secret is patched, not duplicated.
@@ -164,34 +165,35 @@ REG_DOCKER_SANDBOX="docker-sandbox.infra.cloudera.com"
 usage() {
     cat <<'USAGE'
 Usage:
-  source ./set-awc-secrets.sh          Interactively set eight env vars (must source).
-  ./set-awc-secrets.sh --check         Verify namespace and all four secrets.
-  ./set-awc-secrets.sh --namespace     Create the awc-core namespace.
-  ./set-awc-secrets.sh --route         Create the AWS Route53 creds secret.
-  ./set-awc-secrets.sh --robot         Create the CCF API secret.
-  ./set-awc-secrets.sh --registry      Create the registry pull secret.
-  ./set-awc-secrets.sh --ldap          Create the LDAP admin secret.
-  ./set-awc-secrets.sh --delete        Delete all four secrets (namespace kept).
-  ./set-awc-secrets.sh -h | --help     Show this message.
+  source ./set-awc-secrets.sh              Interactively set eight env vars (must source).
+  ./set-awc-secrets.sh --verify-env        Confirm the eight env vars are set (OK/MISSING).
+  ./set-awc-secrets.sh --namespace         Create the awc-core namespace.
+  ./set-awc-secrets.sh --route             Create the AWS Route53 creds secret.
+  ./set-awc-secrets.sh --robot             Create the CCF API secret.
+  ./set-awc-secrets.sh --registry          Create the registry pull secret.
+  ./set-awc-secrets.sh --ldap              Create the LDAP admin secret.
+  ./set-awc-secrets.sh --check             Verify namespace and all four secrets.
+  ./set-awc-secrets.sh --delete            Delete all four secrets (namespace kept).
+  ./set-awc-secrets.sh -h | --help         Show this message.
 
 Environment variables prompted for by the sourced flow (in order):
 
   STUDENT_NUMBER                       (default 33)
 
-  ── Route 53 credentials: student${N}-route53-creds
+  ── Route 53 credentials: student${N}-awc (from 03-02-03) ──
   STUDENT${N}_ACCESS_KEY_ID            (echoed)
   STUDENT${N}_SECRET_ACCESS_KEY        (hidden)
 
-  ── CCF Robot User: awc-taikun-secrets
+  ── CCF Robot User (from 04-01-02) ──
   CCF_PROJECT_ID                       (echoed)
-  CCF_ACCESS_KEY                       (hidden)
+  CCF_ACCESS_KEY                       (echoed)
   CCF_SECRET_KEY                       (hidden)
 
-  ── Cloudera paywall (private registries): awc-console-registry-creds 
+  ── Cloudera paywall (private registries) ──
   PAYWALL_USER                         (echoed)
   PAYWALL_PASS                         (hidden)
 
-  ── AWC Console LDAP bootstrap credentials: ldap-bootstrap-credentials 
+  ── AWC Console LDAP bootstrap credentials ──
   LDAP_USERNAME                        (echoed, default "admin")
   LDAP_PASSWORD                        (hidden)
 
@@ -260,7 +262,7 @@ verify_env() {
     done
     echo
     if [ "$_fail" = "0" ]; then
-        echo "All eight variables are set. Next: ./set-awc-secrets.sh --all"
+        echo "All eight variables are set. Next: ./set-awc-secrets.sh --namespace"
         return 0
     else
         echo "One or more variables is missing. Re-source and fill them in:" >&2
@@ -320,10 +322,17 @@ print_intro() {
     echo
 }
 
+ask_aws_keys() {
+    local _n="$1"
+    echo "── Route 53 credentials: student${_n}-awc (from 03-02-03) ──"
+    prompt_var "STUDENT${_n}_ACCESS_KEY_ID"     "AWS access-key ID"     0
+    prompt_var "STUDENT${_n}_SECRET_ACCESS_KEY" "AWS secret access key" 1
+}
+
 ask_taikun() {
     echo "── CCF Robot User (from 04-01-02) ──"
     prompt_var CCF_PROJECT_ID  "CCF Project ID"  0
-    prompt_var CCF_ACCESS_KEY  "CCF Access Key"  1
+    prompt_var CCF_ACCESS_KEY  "CCF Access Key"  0
     prompt_var CCF_SECRET_KEY  "CCF Secret Key"  1
 }
 
@@ -331,13 +340,6 @@ ask_paywall() {
     echo "── Cloudera paywall (private registries) ──"
     prompt_var PAYWALL_USER "Paywall username" 0
     prompt_var PAYWALL_PASS "Paywall password" 1
-}
-
-ask_aws_keys() {
-    local _n="$1"
-    echo "── Route 53 credentials: student${_n}-awc (from 03-02-03) ──"
-    prompt_var "STUDENT${_n}_ACCESS_KEY_ID"     "AWS access-key ID"     0
-    prompt_var "STUDENT${_n}_SECRET_ACCESS_KEY" "AWS secret access key" 1
 }
 
 ask_ldap_credentials() {
@@ -364,7 +366,7 @@ print_summary() {
     done
     echo "─────────────────────────────────────────────────"
     echo "Every variable above is exported into the current shell."
-    echo "Next: ./set-awc-secrets.sh --namespace"
+    echo "Next: ./set-awc-secrets.sh --verify-env"
 }
 
 # =========================================================================
@@ -379,6 +381,44 @@ create_namespace() {
     else
         kubectl create namespace "$NAMESPACE"
     fi
+    echo
+}
+
+# Create the per-student AWS credentials secret used by external-dns.
+#
+# external-dns runs in its own namespace (external-dns), but this secret is
+# authored in awc-core. Emberstack Reflector — installed by the AWC umbrella
+# chart — mirrors annotated secrets into the namespaces listed on
+# reflection-auto-namespaces. Without those three annotations, external-dns
+# starts up with CreateContainerConfigError ("secret not found") and no DNS
+# records are ever written, which is what the DNS section of the exercise
+# turns on. Annotate at creation time so the mirror happens as soon as
+# reflector's HelmRelease reconciles.
+create_route_secret() {
+    require_env_vars || return 1
+    local _n="${STUDENT_NUMBER:-33}"
+    local _secret="student${_n}-route53-creds"
+    local _key_id_var="STUDENT${_n}_ACCESS_KEY_ID"
+    local _key_sk_var="STUDENT${_n}_SECRET_ACCESS_KEY"
+    local _key_id _key_sk
+    _key_id=$(printenv "$_key_id_var")
+    _key_sk=$(printenv "$_key_sk_var")
+
+    echo "── Secret: $_secret in $NAMESPACE ──"
+    kubectl -n "$NAMESPACE" create secret generic "$_secret" \
+        --from-literal=aws-access-key-id="$_key_id" \
+        --from-literal=aws-secret-access-key="$_key_sk" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    unset _key_id _key_sk
+
+    # Annotate for Reflector auto-mirroring into external-dns namespace.
+    # --overwrite so re-running --route on an existing secret updates the
+    # annotations rather than erroring on "already exists".
+    kubectl -n "$NAMESPACE" annotate secret "$_secret" \
+        reflector.v1.k8s.emberstack.com/reflection-allowed=true \
+        reflector.v1.k8s.emberstack.com/reflection-auto-enabled=true \
+        reflector.v1.k8s.emberstack.com/reflection-auto-namespaces=external-dns \
+        --overwrite >/dev/null
     echo
 }
 
@@ -477,44 +517,6 @@ EOF
     echo
 }
 
-# Create the per-student AWS credentials secret used by external-dns.
-#
-# external-dns runs in its own namespace (external-dns), but this secret is
-# authored in awc-core. Emberstack Reflector — installed by the AWC umbrella
-# chart — mirrors annotated secrets into the namespaces listed on
-# reflection-auto-namespaces. Without those three annotations, external-dns
-# starts up with CreateContainerConfigError ("secret not found") and no DNS
-# records are ever written, which is what the DNS section of the exercise
-# turns on. Annotate at creation time so the mirror happens as soon as
-# reflector's HelmRelease reconciles.
-create_route_secret() {
-    require_env_vars || return 1
-    local _n="${STUDENT_NUMBER:-33}"
-    local _secret="student${_n}-route53-creds"
-    local _key_id_var="STUDENT${_n}_ACCESS_KEY_ID"
-    local _key_sk_var="STUDENT${_n}_SECRET_ACCESS_KEY"
-    local _key_id _key_sk
-    _key_id=$(printenv "$_key_id_var")
-    _key_sk=$(printenv "$_key_sk_var")
-
-    echo "── Secret: $_secret in $NAMESPACE ──"
-    kubectl -n "$NAMESPACE" create secret generic "$_secret" \
-        --from-literal=aws-access-key-id="$_key_id" \
-        --from-literal=aws-secret-access-key="$_key_sk" \
-        --dry-run=client -o yaml | kubectl apply -f -
-    unset _key_id _key_sk
-
-    # Annotate for Reflector auto-mirroring into external-dns namespace.
-    # --overwrite so re-running --route on an existing secret updates the
-    # annotations rather than erroring on "already exists".
-    kubectl -n "$NAMESPACE" annotate secret "$_secret" \
-        reflector.v1.k8s.emberstack.com/reflection-allowed=true \
-        reflector.v1.k8s.emberstack.com/reflection-auto-enabled=true \
-        reflector.v1.k8s.emberstack.com/reflection-auto-namespaces=external-dns \
-        --overwrite >/dev/null
-    echo
-}
-
 # Create the LDAP bootstrap-admin secret.
 create_ldap_secret() {
     require_env_vars || return 1
@@ -526,11 +528,10 @@ create_ldap_secret() {
     echo
 }
 
-
 # Delete all four secrets from the awc-core namespace. Idempotent: uses
 # --ignore-not-found so a missing secret is a no-op, not an error. Does
-# NOT delete the namespace itself — re-run --ccf/--reg/--route/--ldap
-# (or --all) to recreate the secrets into the same namespace.
+# NOT delete the namespace itself — re-run --robot/--registry/--route/--ldap
+# to recreate the secrets into the same namespace.
 delete_all_secrets() {
     local _n="${STUDENT_NUMBER:-33}"
     local _aws_secret="student${_n}-route53-creds"
@@ -548,8 +549,8 @@ delete_all_secrets() {
         "$_aws_secret" \
         "$LDAP_SECRET"
     echo
-    echo "Done. Namespace $NAMESPACE was kept — re-run --all (or the"
-    echo "per-secret flags) to recreate the four secrets in it."
+    echo "Done. Namespace $NAMESPACE was kept — re-run --robot/--registry/--route/--ldap"
+    echo "to recreate the four secrets in it."
 }
 
 # =========================================================================
@@ -611,7 +612,7 @@ check_all() {
         return 0
     else
         echo "One or more required resources is missing or misconfigured." >&2
-        echo "Re-run the missing create step, or './set-awc-secrets.sh --all'." >&2
+        echo "Re-run the missing create step." >&2
         return 1
     fi
 }
@@ -621,14 +622,15 @@ check_all() {
 # =========================================================================
 
 # Unset every helper function and helper variable this script defines so
-# the parent shell is not polluted after a source.
+# the parent shell is not polluted after a source. NOTE: LDAP_USERNAME and
+# LDAP_PASSWORD are intentionally NOT unset so they persist in the shell.
 cleanup() {
     unset -f usage require_sourced require_env_vars verify_env
     unset -f ask_student_number prompt_var print_intro
-    unset -f ask_taikun ask_paywall ask_aws_keys ask_ldap_credentials
+    unset -f ask_aws_keys ask_taikun ask_paywall ask_ldap_credentials
     unset -f print_summary
-    unset -f create_namespace create_robot_secret create_registry_secret
-    unset -f create_route_secret create_ldap_secret
+    unset -f create_namespace create_route_secret create_robot_secret
+    unset -f create_registry_secret create_ldap_secret
     unset -f delete_all_secrets
     unset -f check_secret check_all
     unset -f main
@@ -637,7 +639,6 @@ cleanup() {
     unset AWC_MARKETPLACE_REGISTRIES AWC_MARKETPLACE_SYNC_INTERVAL
     unset CCF_API_HOST CCF_ACCOUNT_NAME CCF_ORGANIZATION_ID
     unset REG_CONTAINER REG_DOCKER_PRIVATE REG_DOCKER_SANDBOX
-    unset LDAP_USERNAME LDAP_PASSWORD
     # cleanup unsets itself last.
     unset -f cleanup
 }
@@ -655,8 +656,8 @@ main() {
         -h|--help)
             usage
             ;;
-        --check)
-            check_all
+        --verify-env)
+            verify_env
             _rc=$?
             ;;
         --namespace)
@@ -677,6 +678,10 @@ main() {
             ;;
         --ldap)
             create_ldap_secret
+            _rc=$?
+            ;;
+        --check)
+            check_all
             _rc=$?
             ;;
         --delete)
