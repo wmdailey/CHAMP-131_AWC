@@ -5,7 +5,7 @@
 # Two independent duties:
 #
 #   1. SOURCE the script (no flags) to interactively set and export the
-#      eight shell environment variables that Phase A depends on:
+#      eight shell environment variables that Secrets depends on:
 #
 #          source ./set-awc-secrets.sh
 #
@@ -316,7 +316,7 @@ prompt_var() {
 
 print_intro() {
     echo
-    echo "Setting Phase A credentials for student ${STUDENT_NUMBER}."
+    echo "Setting secret credentials for student ${STUDENT_NUMBER}."
     echo "Press Enter at any prompt to keep the value shown in [brackets]."
     echo "Secret prompts do not echo what you type."
     echo
@@ -608,7 +608,7 @@ check_all() {
     echo
 
     if [ "$_fail" = "0" ]; then
-        echo "All required resources present. Phase A complete — proceed to Phase B."
+        echo "All required resources present. Create Secrets complete — proceed to the next exercise."
         return 0
     else
         echo "One or more required resources is missing or misconfigured." >&2
