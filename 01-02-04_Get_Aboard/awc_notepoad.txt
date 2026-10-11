@@ -26,6 +26,7 @@ CONFIGURE CCFs AWS CREDENTIALS
 
 CONFIGURE ROBOT USER
 User: student33-robuser
+* CCF Project ID: XXXXX 
 * Robot User Access Key: XXXXXXXXX 
 * Robot User Secret Key: XXXXXXXXX 
 
@@ -49,6 +50,8 @@ curl -ku "32a33f68-5708-49da-bef0-164165815537:3ff22842eee5” \
   https://container.repository.cloudera.com/v2/cloudera-helm/awc-core/anywhere-cloud/manifests/1.0.0-b24
 
 CONFIGURE CATALOG
+* Interal: docker-private.infra.cloudera.com
+* Default: docker-private.infra.cloudera.com 
 * DNS BaseDomain: a19881.test.cldr.work
 * DNS ClusterDomain: student<XX>.a19881.test.cldr.work
 * externalDns.enabled: true
@@ -56,7 +59,6 @@ CONFIGURE CATALOG
 CONFIGURE SECRETS
 * Namespace: awc-core
 * Route 53 Secret: student${N}-route53-creds
-* CCF Project ID: XXXXX 
 * Cloud Factory Robot Secret: awc-taikun-secrets
 * Registry Secret: awc-console-registry-creds
 * LDAP Secret: ldap-bootstrap-credentials
@@ -67,11 +69,14 @@ CONFIGURE LDAP USER
 
 CONFIGURE SSH ACCESS
 * SSH key: student<xx>-key
-* Bastion:  10.80.149.32
-* Master01:  10.80.153.20
-* Worker01:  10.80.156.163
-* Worker02: 10.80.128.221
-* Worker03:  10.80.152.212
+* Bastion:  XXX.XXX.XXX.XXX 
+* Master01: XXX.XXX.XXX.XXX 
+* Worker01: XXX.XXX.XXX.XXX 
+* Worker02: XXX.XXX.XXX.XXX 
+* Worker03: XXX.XXX.XXX.XXX 
+
+URL TO LOGIN
+* https://console.student<XX>.a19881.test.cldr.work
 
 CLEAR DNS CACHE
 sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
