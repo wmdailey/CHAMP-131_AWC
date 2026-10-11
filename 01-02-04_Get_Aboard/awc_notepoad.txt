@@ -1,4 +1,4 @@
-Anywhere Cloud Notepad 
+*** Anywhere Cloud Notepad ***
 
 CONFIGURE ACCESS TO DOCS
 * https://docs-beta.cloudera.com/cloudera-anywhere-cloud/test/index
@@ -49,7 +49,7 @@ CONFIGURE CONTAINER REGISTRY
 curl -ku "32a33f68-5708-49da-bef0-164165815537:3ff22842eee5” \
   https://container.repository.cloudera.com/v2/cloudera-helm/awc-core/anywhere-cloud/manifests/1.0.0-b24
 
-CONFIGURE CATALOG
+CONFIGURE CATALOG PARAMETERS
 * Interal: docker-private.infra.cloudera.com
 * Default: docker-private.infra.cloudera.com 
 * DNS BaseDomain: a19881.test.cldr.work
