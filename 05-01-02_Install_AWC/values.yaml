@@ -1,14 +1,14 @@
 global:
   registries:
-    internal: container.repository.cloudera.com
-    default:  container.repository.cloudera.com
+    internal: docker-private.infra.cloudera.com 
+    default: docker-private.infra.cloudera.com
   registryCredsSecret: awc-console-registry-creds
 
 taikunSecret: awc-taikun-secrets
 
 dns:
   baseDomain: "a19881.test.cldr.work"
-  clusterDomain: "student<XX>.a19881.test.cldr.work"
+  consoleDomain: "student<XX>.a19881.test.cldr.work"
 
 preInstallCheckSingleConsole:
   enabled: false
@@ -38,4 +38,8 @@ externalDns:
             key: aws-secret-access-key
       - name: AWS_DEFAULT_REGION
         value: "us-west-2"
+
+        policy: sync
+        interval: "30s"
+
 
