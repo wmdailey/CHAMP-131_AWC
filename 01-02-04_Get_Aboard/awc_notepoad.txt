@@ -63,9 +63,17 @@ CONFIGURE SECRETS
 * Registry Secret: awc-console-registry-creds
 * LDAP Secret: ldap-bootstrap-credentials
 
-CONFIGURE LDAP USER
+CONFIGURE LDAP 
 * User: admin
 * Password: BadPass@1
+* URL: ldap://ldap.knox.svc.cluster.local:33389
+* Bind: uid=admin,ou=people,dc=hadoop,dc=apache,dc=org
+* Password: BadPass@1
+* UID: ou=people,dc=hadoop,dc=apache,dc=org
+* Filter: (&(objectClass=person)(uid={0}))
+* GID: ou=groups,dc=hadoop,dc=apache,dc=org
+* Filter: (&(objectClass=groupOfNames)(member={0}))
+* Mail: mail
 
 CONFIGURE SSH ACCESS
 * SSH key: student<xx>-key
