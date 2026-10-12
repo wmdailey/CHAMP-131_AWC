@@ -1,0 +1,12 @@
+export KUBECONFIG=~/Downloads/student<XX>-awc-console-kube-config.yaml
+
+kubectl get secret awc-taikun-secrets -n awc-core \
+  -o jsonpath='{.data.MARKETPLACE_REGISTRIES}' | base64 -d; echo
+
+Update the value :
+-------------------
+kubectl patch secret awc-taikun-secrets -n awc-core -p '{"stringData": {"MARKETPLACE_REGISTRIES": "docker-private.infra.cloudera.com/cloudera/awc-marketplace/v2/int", "MARKETPLACE_SYNC_INTERVAL": "60"}}'
+
+Do Deployment rollout:
+----------------------
+kubectl rollout restart deployment/awc-console -n awc-core 2>&1 && kubectl rollout status deployment/awc-console -n awc-core 2>&1
