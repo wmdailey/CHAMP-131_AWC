@@ -1,4 +1,6 @@
 
+# This patch must be applied to gain access to the Data Services tiles. 
+# There is a Jira ticket seeking correction.
 
 Check the current value :
 -------------------
