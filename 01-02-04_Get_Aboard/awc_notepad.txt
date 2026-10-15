@@ -10,13 +10,13 @@ student ID: student<XX>
 ⚠ WARNING — Use Your Own Student ID. This exercise is written for student 33. Up to 24 students may be onboarding CCF in parallel against the same AWS account, and CCF cloud-credential names, private-repository names, robot-user names, and SSH key names are all globally unique per tenant. Wherever you see student<XX> substitute your own student number (e.g. student07-aws-cred). 
 
 CONFIGURE IAM USER 
+* student<XX>-iam
 * ccf.cloudera.com/org = eng-ai-prod-enablement-dev
 * ccf.cloudera.com/org-id = 109
-* ccf.cloudera.com/project = student<XX>-proj
+* ccf.cloudera.com/project = student<XX>-awc-console
 * ccf.cloudera.com/managed = false 
 
 CONFIGURE CCFs AWS CREDENTIALS
-* StudentID: student33
 * IAM Access Key: XXXXXXXXXXX 
 * IAM Secret Key: XXXXXXXXXXX
 * AWS region: us-west-2
@@ -25,7 +25,7 @@ CONFIGURE CCFs AWS CREDENTIALS
 * EFS: fs-060a4f10832a85se8 (awc-efs-backups) 0 GB
 
 CONFIGURE ROBOT USER
-User: student33-robuser
+* User: student<XX>-robot
 * CCF Project ID: XXXXX 
 * Robot User Access Key: XXXXXXXXX 
 * Robot User Secret Key: XXXXXXXXX 
@@ -46,11 +46,11 @@ CONFIGURE CONTAINER REGISTRY
 * Container Registry: container.repository.cloudera.com
 * Paywall License login: 32a33f68-5708-49da-bef0-164165815537
 * Paywall  Password: 3ff22842eee5
-curl -ku "32a33f68-5708-49da-bef0-164165815537:3ff22842eee5” \
+* curl -ku "32a33f68-5708-49da-bef0-164165815537:3ff22842eee5” \
   https://container.repository.cloudera.com/v2/cloudera-helm/awc-core/anywhere-cloud/manifests/1.0.0-b24
 
 CONFIGURE SSH ACCESS
-* SSH key: student<xx>-key
+* User: student<xx>-key
 * Bastion:  XXX.XXX.XXX.XXX 
 * Master01: XXX.XXX.XXX.XXX 
 * Worker01: XXX.XXX.XXX.XXX 
@@ -67,7 +67,7 @@ CONFIGURE CATALOG PARAMETERS
 CONFIGURE SECRETS
 * Namespace: awc-core
 * Route 53 Secret: student${N}-route53-creds
-* Cloud Factory Robot Secret: awc-taikun-secrets
+* Robot Secret: awc-taikun-secrets
 * Registry Secret: awc-console-registry-creds
 * LDAP Secret: ldap-bootstrap-credentials
 
